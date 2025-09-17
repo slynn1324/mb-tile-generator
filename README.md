@@ -1,0 +1,22 @@
+# OpenScad Multiboard tile generator
+
+## Setup
+
+Due to licensing constraints, the Multiboard STL remix files are not included.  Please download the files from:
+
+https://thangs.com/designer/Multiboard/3d-model/Tile%20Components%20-%20STL%20Multiboard%20Remixing%20Files-994663
+
+and extract the zip file into the "remix-files" directory.
+
+
+## Configure
+
+Change the LAYOUT array in the script to suit your needs.  
+
+
+## Notes
+Newer nightly releases of OpenScad are recommended for vastly improved rendering performance.  Tested with version 2025.09.16. 
+
+
+
+
