@@ -104,7 +104,7 @@ for ( y = [0:len(grid)-1]){
             
                     import(large_octagon_hole_with_side_holes_file);
                     
-                    echo("y=", y, " x=", x, " setting=", grid[y][x]);
+                    // echo("y=", y, " x=", x, " setting=", grid[y][x]);
                     
                     // top right corner
                     if ( grid[y][x][0] == EDGE_V ){
