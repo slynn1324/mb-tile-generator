@@ -14,6 +14,11 @@ and extract the zip file into the "remix-files" directory.
 Change the LAYOUT array in the script to suit your needs.  
 
 
+## GUI
+
+`python3 mb-tile-generator.py` from this working directory.
+
+
 ## Notes
 Newer nightly releases of OpenScad are recommended for vastly improved rendering performance.  Tested with version 2025.09.16. 
 
