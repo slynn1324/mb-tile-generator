@@ -22,6 +22,6 @@ Change the LAYOUT array in the script to suit your needs.
 ## Notes
 Newer nightly releases of OpenScad are recommended for vastly improved rendering performance.  Tested with version 2025.09.16. 
 
-
+Don't judge me on the Python code... It was largely an exercise in what Copilot could generate.  Lots of clean up could happen, but "it runs on my computer".  YMMV.
 
 
