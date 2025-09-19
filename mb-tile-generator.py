@@ -17,8 +17,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
 # --- Configuration ---
-DEFAULT_ROWS = 8
-DEFAULT_COLS = 8
+DEFAULT_ROWS = 9
+DEFAULT_COLS = 9
 
 WORKSPACE_DIR = os.path.dirname(os.path.abspath(__file__))
 SCAD_PATH = os.path.join(WORKSPACE_DIR, "multiboard-tile.scad")
@@ -201,7 +201,8 @@ class LayoutEditor(tk.Tk):
         # Presets dropdown button (opens a popup with preset icons)
         ttk.Button(frm_top, text='▢', command=self._open_presets_popup).pack(side='left', padx=(0, 12))
         # Export icon button: use a document + arrow glyph; behavior unchanged
-        ttk.Button(frm_top, text='→', command=self._export_stl).pack(side='left', padx=6)
+        ttk.Button(frm_top, text='→ stl', command=self._export_stl).pack(side='left', padx=6)
+        ttk.Button(frm_top, text='→ scad', command=self._export_scad).pack(side='left', padx=6)
 
         # preset patterns for different border configurations
         self._preset_patterns = {
@@ -635,6 +636,42 @@ class LayoutEditor(tk.Tk):
     def _gather_layout(self):
         # Our grid is stored in self.layout as abbreviations already; return a copy
         return [list(row) for row in self.layout]
+
+    def _export_scad(self):
+        # prompt for output SCAD path
+        out_path = filedialog.asksaveasfilename(defaultextension='.scad', filetypes=[('OpenSCAD Script', '*.scad')], title='Save SCAD script as')
+        if not out_path:
+            return
+
+        # generate script that calls mb_tile() with current layout
+        layout = self._gather_layout()
+        script = build_layout_scad_script(layout)
+
+        # extract layout info comments from the main scad file
+        scad_content = load_scad_text()
+        layout_comments = ''
+        try:
+            start_marker = '// layout info'
+            end_marker = '// end layout info'
+            start_index = scad_content.find(start_marker)
+            if start_index != -1:
+                end_index = scad_content.find(end_marker, start_index)
+                if end_index != -1:
+                    # also include the end_marker line
+                    end_index = scad_content.find('\n', end_index)
+                    layout_comments = scad_content[start_index:end_index + 1]
+        except Exception:
+            pass # ignore if markers are not found or any other error
+
+        final_script = layout_comments + "\n\n" + script
+        
+        try:
+            with open(out_path, 'w', encoding='utf-8') as f:
+                f.write(final_script)
+            self._log('Exported', out_path)
+            messagebox.showinfo('Done', f'Exported {out_path}')
+        except Exception as ex:
+            messagebox.showerror('Error', f'Failed to save SCAD file: {ex}')
 
     def _export_stl(self):
         # prompt for output STL path

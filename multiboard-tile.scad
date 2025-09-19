@@ -3,7 +3,6 @@
 large_octagon_hole_with_side_holes_file = "remix-files/Large Octagon Hole with side holes (Positive).stl";
 small_thread_hole_with_side_bumps_file = "remix-files/Small Thread Hole with side bumps (Positive).stl";
 
-
 spacing = 25;
 
 // CORNER_STYLES
@@ -23,6 +22,8 @@ LEFT_EDGE = [ SMALL_THREAD, NONE, NONE, EDGE_V ];
 RIGHT_EDGE = [ EDGE_V, NONE, NONE, NONE ];
 BOTTOM_EDGE = [ SMALL_THREAD, EDGE_H, NONE, NONE ];
 TOP_EDGE = [ EDGE_H, NONE, NONE, NONE ];
+TOP_AND_BOTTOM_EDGE = [EDGE_H, EDGE_H, EDGE_H, EDGE_H ];
+LEFT_AND_RIGHT_EDGE = [EDGE_V, EDGE_V, EDGE_V, EDGE_V ];
 
 // CELL_STYLES_ABBREVIATED
 O = NORMAL;
@@ -35,8 +36,31 @@ TL = TOP_LEFT_CORNER;
 B = BOTTOM_EDGE;
 T = TOP_EDGE;
 X = SKIP;
-TB = [ EDGE_H, NONE, NONE, EDGE_H ];
-LR = [ EDGE_V, NONE, NONE, EDGE_V ];
+TB = [ EDGE_H, EDGE_H, EDGE_H, EDGE_H ];
+LR = [ EDGE_V, EDGE_V, EDGE_V, EDGE_V ];
+
+// layout info
+//
+// cells are defined as a quadlet of corner styles:
+// [ {top-right, {bottom-right}, {bottom-left}, {top-left} ]
+// where each corner style is one of { SMALL_THREAD | EDGE_H | EDGE_V | NONE }
+//
+// - or - as one of the following cell style abbreviations:
+// O  | NORMAL 
+// R  | RIGHT_EDGE 
+// L  | LEFT_EDGE
+// BR | BOTTOM_RIGHT_CORNER
+// BL | BOTTOM_LEFT_CORNER
+// TR | TOP_RIGHT_CORNER
+// TL | TOP_LEFT_CORNER
+// B  | BOTTOM_EDGE
+// T  | TOP_EDGE
+// TB | TOP_AND_BOTTOM_EDGE
+// LR | LEFT_AND_RIGHT_EDGE
+// X  | SKIP
+// 
+// end layout info
+
 
 
 
