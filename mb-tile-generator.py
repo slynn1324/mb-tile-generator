@@ -11,23 +11,22 @@ Usage: run this script from the project folder or anywhere; it writes to the SCA
 """
 
 import os
-import re
 import subprocess
 import sys
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
-import tempfile
 
 # --- Configuration ---
+DEFAULT_ROWS = 8
+DEFAULT_COLS = 8
+
 WORKSPACE_DIR = os.path.dirname(os.path.abspath(__file__))
 SCAD_PATH = os.path.join(WORKSPACE_DIR, "multiboard-tile.scad")
 OPENSCAD_CMD = "/Applications/OpenScad.app/Contents/MacOS/OpenSCAD"
-EXPORT_CMD_TEMPLATE = '"{openscad}" --export-format binstl -o "{out}" "{scad}"'
-OUT_STL = os.path.join(WORKSPACE_DIR, "test.stl")
+EXPORT_CMD_TEMPLATE = '"{openscad}" /dev/stdin --export-format binstl -o "{out}"'
 
-# Abbreviations discovered in the scad file
 # Abbreviations and their full style names (from multiboard-tile.scad)
-ABBREVS = ["O", "R", "L", "BR", "BL", "TR", "TL", "B", "T", "X"]
+ABBREVS = ["O", "R", "L", "BR", "BL", "TR", "TL", "B", "T", "X", "LR", "TB"]
 ABBREV_TO_NAME = {
     "O": "NORMAL",
     "R": "RIGHT_EDGE",
@@ -39,12 +38,9 @@ ABBREV_TO_NAME = {
     "B": "BOTTOM_EDGE",
     "T": "TOP_EDGE",
     "X": "SKIP",
+    "LR": "LEFT_RIGHT_EDGES",
+    "TB": "TOP_BOTTOM_EDGES",
 }
-NAME_TO_ABBREV = {v: k for k, v in ABBREV_TO_NAME.items()}
-FULL_STYLE_NAMES = [ABBREV_TO_NAME[a] for a in ABBREVS]
-
-# Regex helpers
-LAYOUT_START_RE = re.compile(r"^\s*LAYOUT\s*=\s*\[", re.MULTILINE)
 
 # --- File parsing utilities ---
 
@@ -100,19 +96,17 @@ def extract_layout_tokens(text):
     return rows
 
 
-def build_layout_text(layout):
-    """Given layout as list-of-lists of abbreviations, produce a formatted LAYOUT = [ ... ]; string.
-    Uses the same style seen in the repository (2-space indent inside arrays).
-    """
-    lines = ["LAYOUT = ["]
+def build_layout_scad_script(layout):
+    """Given layout as list-of-lists of abbreviations, produce a script that calls mb_tile()."""
+    # Convert layout to proper OpenSCAD array format
+    rows = []
     for row in layout:
-        row_items = ", ".join(row)
-        lines.append(f"    [ {row_items} ],")
-    if lines:
-        # replace trailing comma on last row
-        lines[-1] = lines[-1].rstrip(',')
-    lines.append("];\n")
-    return "\n".join(lines)
+        row_items = ", ".join(f'{abbr}' for abbr in row)
+        rows.append(f"    [ {row_items} ]")
+    layout_array = "[\n" + ",\n".join(rows) + "\n]"
+    
+    script = f'include <{SCAD_PATH}>;\nmb_tile({layout_array});'
+    return script
 
 
 def load_scad_text():
@@ -164,22 +158,26 @@ class LayoutEditor(tk.Tk):
             self.destroy()
             return
 
-        parsed = extract_layout_tokens(self.scad_text)
-        if not parsed:
-            # default small layout
-            parsed = [["TL", "T", "TR"], ["L", "O", "R"], ["BL", "B", "BR"]]
-
-        self.layout = parsed
-        self.rows = tk.IntVar(value=len(self.layout))
-        self.cols = tk.IntVar(value=len(self.layout[0]) if self.layout else 0)
+        # Always start with a default 8x8 layout with borders
+        # self.layout = create_default_layout(8, 8)
+        self.layout = []
+        self.rows = tk.IntVar(value=DEFAULT_ROWS)
+        self.cols = tk.IntVar(value=DEFAULT_COLS)
 
         self._vars = []  # matrix of StringVar for dropdowns
 
         # track last-clicked cell (for preset buttons)
         self._last_clicked = None
 
+        
+
         self._build_ui()
+        
+        self._apply_preset_to_all(self._preset_patterns['ALL'])
         self._populate_grid()
+
+
+        
 
     def _build_ui(self):
         frm_top = ttk.Frame(self)
@@ -205,27 +203,7 @@ class LayoutEditor(tk.Tk):
         # Export icon button: use a document + arrow glyph; behavior unchanged
         ttk.Button(frm_top, text='→', command=self._export_stl).pack(side='left', padx=6)
 
-        # ai slop... these should be consolidated...but I'm out of credits and too lazy to refactor it myself.
-        # store presets for the popup to use
-        self._presets = [
-            ("No Borders", {'top':False,'bottom':False,'left':False,'right':False}, 'O'),
-            ("All borders", {'top':True,'bottom':True,'left':True,'right':True}, 'X'),
-            ("Top and Bottom Borders", {'top':True,'bottom':True,'left':False,'right':False}, 'T'),
-            ("Top Border", {'top':True,'bottom':False,'left':False,'right':False}, 'T'),
-            ("Right Border", {'top':False,'bottom':False,'left':False,'right':True}, 'R'),
-            ("Bottom Border", {'top':False,'bottom':True,'left':False,'right':False}, 'B'),
-            ("Left Border", {'top':False,'bottom':False,'left':True,'right':False}, 'L'),
-            ("Left and Right Borders", {'top':False,'bottom':False,'left':True,'right':True}, 'L'),
-            # corner-pair presets
-            ("Top and Left Borders", {'top':True,'bottom':False,'left':True,'right':False}, 'TL'),
-            ("Top and Right Borders", {'top':True,'bottom':False,'left':False,'right':True}, 'TR'),
-            ("Bottom and Left Borders", {'top':False,'bottom':True,'left':True,'right':False}, 'BL'),
-            ("Bottom and Right Borders", {'top':False,'bottom':True,'left':False,'right':True}, 'BR'),
-            ("Left, Top, and Bottom Borders", {'top':True,'bottom':True,'left':True,'right':False}, 'TL'),
-            ("Right Top and Bottom Borders", {'top':True,'bottom':True,'left':False,'right':True}, 'TR'),
-        ]
-
-        # explicit preset patterns (allow keys for multi-side combinations)
+        # preset patterns for different border configurations
         self._preset_patterns = {
             # top row
             'LTR': {'top':True, 'left':True, 'right':True, 'bottom':False},
@@ -268,7 +246,7 @@ class LayoutEditor(tk.Tk):
         # bottom log
         self.log = tk.Text(self, height=8)
         self.log.pack(fill='x', padx=8, pady=(0, 8))
-        self._log('Loaded %s' % os.path.basename(SCAD_PATH))
+        self._log('Started with default layout with borders')
 
     def _log(self, *parts):
         self.log.insert('end', ' '.join(str(p) for p in parts) + '\n')
@@ -311,7 +289,10 @@ class LayoutEditor(tk.Tk):
         except Exception:
             pass
 
-    def _apply_preset_to_all(self, abbr, pattern=None):
+    def _apply_preset_to_all(self, pattern=None):
+
+        self._last_pattern = pattern
+
         # apply preset abbreviation to every cell in the current grid
         r = self.rows.get()
         c = self.cols.get()
@@ -443,6 +424,14 @@ class LayoutEditor(tk.Tk):
             # SKIP: draw an X
             canvas.create_line(pad, pad, w - pad, h - pad, fill='red', width=3)
             canvas.create_line(pad, h - pad, w - pad, pad, fill='red', width=3)
+        elif abbr == 'LR':
+            # LEFT_RIGHT_EDGES: left and right borders only
+            line('left')
+            line('right')
+        elif abbr == 'TB':
+            # TOP_BOTTOM_EDGES: top and bottom borders only  
+            line('top')
+            line('bottom')
         else:
             # edges and corners
             name = ABBREV_TO_NAME.get(abbr, '')
@@ -489,26 +478,19 @@ class LayoutEditor(tk.Tk):
         top.title('Select style')
         top.transient(self)
         top.resizable(False, False)
-        # ordered grid of icons: directional layout in a 3x3 grid, then SKIP
-        ordered = ['TL', 'T', 'TR',
-                   'L',  'O', 'R',
-                   'BL', 'B', 'BR',
-                   'X']
+        # ordered grid of icons: directional layout in a 4x3 grid
+        ordered = [
+            'TL', 'T', 'TR',
+            'L',  'O', 'R', 
+            'BL', 'B', 'BR',
+            'LR', 'X', 'TB'
+        ]
         cols = 3
-        # compute how many rows and how many items will be in the last row so
-        # we can center them horizontally (this handles the lone 'X' nicely)
-        rows = (len(ordered) + cols - 1) // cols
-        last_row_count = len(ordered) - cols * (rows - 1)
+        rows = 4
+        
         for idx, abbr in enumerate(ordered):
             r = idx // cols
-            # by default place in natural column, but if this is the last row
-            # offset columns so the items are centered horizontally
-            if r == rows - 1:
-                offset_in_last = idx - (rows - 1) * cols
-                start_c = (cols - last_row_count) // 2
-                c = start_c + offset_in_last
-            else:
-                c = idx % cols
+            c = idx % cols
             cv = tk.Canvas(top, width=48, height=48, highlightthickness=1, relief='ridge')
             cv.grid(row=r, column=c, padx=4, pady=4)
             self._draw_icon_on_canvas(cv, abbr)
@@ -588,24 +570,22 @@ class LayoutEditor(tk.Tk):
         # Converted abbreviation grid (left-to-right, top-to-bottom):
         desired_abbrs = [
             'LTR', 'LT', 'T',  'TR',
-            'LR',   'L',  'O',  'R',
-            'LBR',  'BL', 'B',  'BR',
-            'X',   'LTB', 'BT',  'TRB',
+            'LR',   'L',  'NONE',  'R',
+            'LBR',  'LB', 'B',  'BR',
+            'ALL',   'LTB', 'BT',  'TRB',
         ]
         cols = 4
-        # build a lookup from abbreviation to pattern using self._presets
-        pattern_lookup = {abbr: pattern for (name, pattern, abbr) in self._presets}
         for idx, abbr in enumerate(desired_abbrs):
             r = idx // cols
             c = idx % cols
-            # prefer explicit multi-side patterns if provided, otherwise fall back to presets
-            pattern = self._preset_patterns.get(abbr, pattern_lookup.get(abbr, {'top':False,'bottom':False,'left':False,'right':False}))
+            # get pattern from preset patterns, fallback to no borders if not found
+            pattern = self._preset_patterns.get(abbr, {'top':False,'bottom':False,'left':False,'right':False})
             cv = tk.Canvas(top, width=48, height=48, highlightthickness=1, relief='ridge')
             cv.grid(row=r, column=c, padx=4, pady=4)
             # draw the preset icon using same drawing routine
             self._draw_preset_icon(cv, pattern)
             def make_cb(a=abbr, pat=pattern):
-                return lambda e: (self._apply_preset_to_all(a, pat), top.destroy())
+                return lambda e: (self._apply_preset_to_all(pat), top.destroy())
             cv.bind('<Button-1>', make_cb())
 
         # compute size and center horizontally; align top to the menu separator bottom
@@ -645,79 +625,40 @@ class LayoutEditor(tk.Tk):
         except Exception:
             messagebox.showerror('Invalid', 'Rows and Cols must be integers')
             return
-        # resize internal layout
-        new = []
-        for i in range(r):
-            row = []
-            for j in range(c):
-                if i < len(self.layout) and j < len(self.layout[0]):
-                    row.append(self.layout[i][j])
-                else:
-                    row.append('O')
-            new.append(row)
-        self.layout = new
+        
+        # Create new layout with proper border logic
+        #self.layout = create_default_layout(r, c)
+        if ( self._last_pattern is not None ):
+            self._apply_preset_to_all(self._last_pattern)
         self._populate_grid()
 
     def _gather_layout(self):
         # Our grid is stored in self.layout as abbreviations already; return a copy
         return [list(row) for row in self.layout]
 
-    def _save_to_scad(self):
-        layout = self._gather_layout()
-        new_block = build_layout_text(layout)
-        # replace in SCAD
-        text = self.scad_text
-        s, e = find_layout_block(text)
-        if s is None:
-            messagebox.showerror('Error', 'Could not find LAYOUT block in SCAD file')
-            return
-        new_text = text[:s] + new_block + text[e:]
-        try:
-            # write to a temporary SCAD file instead of overwriting the original
-            temp_path = write_temp_scad_text(new_text)
-            self.temp_scad = temp_path
-            # update internal layout (but do not modify the original file on disk)
-            self.layout = layout
-            self._log('Wrote temporary SCAD to', temp_path)
-            messagebox.showinfo('Saved', f'Wrote temporary SCAD:\n{temp_path}')
-        except Exception as ex:
-            messagebox.showerror('Error', f'Failed to write temporary SCAD: {ex}')
-
     def _export_stl(self):
-        # ensure scad saved first
-        # prompt for output STL path (and write paired .scad alongside it)
+        # prompt for output STL path
         out_path = filedialog.asksaveasfilename(defaultextension='.stl', filetypes=[('STL', '*.stl')], title='Save STL as')
         if not out_path:
             return
 
-        # save current layout into SCAD text
+        # generate script that calls mb_tile() with current layout
         layout = self._gather_layout()
-        new_block = build_layout_text(layout)
-        text = self.scad_text
-        s, e = find_layout_block(text)
-        if s is None:
-            messagebox.showerror('Error', 'Could not find LAYOUT block in SCAD file')
-            return
-        new_text = text[:s] + new_block + text[e:]
-
-        scad_path = os.path.splitext(out_path)[0] + '.scad'
+        script = build_layout_scad_script(layout)
+        
+        cmd = EXPORT_CMD_TEMPLATE.format(openscad=OPENSCAD_CMD, out=out_path)
+        self._log('Running OpenSCAD with mb_tile() script')
+        self._log('Script:', script.replace('\n', ' '))
+        self._log('Command:', cmd)
+        
         try:
-            write_named_scad_text(scad_path, new_text)
-        except Exception as ex:
-            messagebox.showerror('Error', f'Failed to write SCAD next to output: {ex}')
-            return
-
-        cmd = EXPORT_CMD_TEMPLATE.format(openscad=OPENSCAD_CMD, out=out_path, scad=scad_path)
-        self._log('Running OpenSCAD on', scad_path)
-        self._log('Running:', cmd)
-        try:
-            # run the command
-            proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
-            out, _ = proc.communicate()
+            # run the command with script passed via stdin
+            proc = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+            out, _ = proc.communicate(input=script)
             self._log(out)
             if proc.returncode == 0:
-                self._log('Exported', OUT_STL)
-                messagebox.showinfo('Done', f'Exported {OUT_STL}')
+                self._log('Exported', out_path)
+                messagebox.showinfo('Done', f'Exported {out_path}')
             else:
                 messagebox.showerror('OpenSCAD failed', f'Exit {proc.returncode}\nSee log for details')
         except Exception as ex:

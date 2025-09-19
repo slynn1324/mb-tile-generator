@@ -35,6 +35,8 @@ TL = TOP_LEFT_CORNER;
 B = BOTTOM_EDGE;
 T = TOP_EDGE;
 X = SKIP;
+TB = [ EDGE_H, NONE, NONE, EDGE_H ];
+LR = [ EDGE_V, NONE, NONE, EDGE_V ];
 
 
 
@@ -50,25 +52,25 @@ X = SKIP;
 //     [ BOTTOM_EDGE, BOTTOM_EDGE, BOTTOM_EDGE, BOTTOM_RIGHT_CORNER ]
 // ];
 
-LAYOUT = [
+// EXAMPLE_LAYOUT = [
 
-    [ TL, T, T, T, T, T, T, T, TR ],
-    [ L, O, O, O, O, O, O, O, R ],
-    [ L, O, O, O, O, O, O, O, R ],
-    [ L, O, O, O, O, O, O, O, R ],
-    [ L, O, O, O, O, O, O, O, R ],
-    [ L, O, O, O, O, O, O, O, R ],
-    [ L, O, O, O, O, O, O, O, R ],
-    [ L, O, O, O, O, O, O, O, R ],
-    [ BL, B, B, B, B, B, B, B, BR ]
+//     [ TL, T, T, T, T, T, T, T, TR ],
+//     [ L, O, O, O, O, O, O, O, R ],
+//     [ L, O, O, O, O, O, O, O, R ],
+//     [ L, O, O, O, O, O, O, O, R ],
+//     [ L, O, O, O, O, O, O, O, R ],
+//     [ L, O, O, O, O, O, O, O, R ],
+//     [ L, O, O, O, O, O, O, O, R ],
+//     [ L, O, O, O, O, O, O, O, R ],
+//     [ BL, B, B, B, B, B, B, B, BR ]
 
-];
+// ];
 
 
 
 
 // the grid is flipped from layout in the y direction, so we build bottom-up
-grid = [for (i = [len(LAYOUT)-1 : -1 : 0]) LAYOUT[i]];
+// grid = [for (i = [len(LAYOUT)-1 : -1 : 0]) LAYOUT[i]];
 
 module small_thread(){
     import(small_thread_hole_with_side_bumps_file);
@@ -112,155 +114,162 @@ module horizontal_edge_with_side_bumps(){
     }
 }
 
-for ( y = [0:len(grid)-1]){
-    translate([0, y*spacing, 0]) {
+module mb_tile(LAYOUT){
+
+    grid = [for (i = [len(LAYOUT)-1 : -1 : 0]) LAYOUT[i]];
+
+
+    for ( y = [0:len(grid)-1]){
+        translate([0, y*spacing, 0]) {
+        
+            for ( x = [0:len(grid[y])-1]){
     
-        for ( x = [0:len(grid[y])-1]){
-  
-            if ( grid[y][x] != SKIP ){
+                if ( grid[y][x] != SKIP ){
 
-                translate([x*spacing, 0, 0]){
+                    translate([x*spacing, 0, 0]){
+                    
                 
-            
-                    import(large_octagon_hole_with_side_holes_file);
-                    
-                    // echo("y=", y, " x=", x, " setting=", grid[y][x]);
-                    
-                    // top right corner
-                    if ( grid[y][x][0] == EDGE_V ){
-                        vertical_edge_with_side_bumps();
-                        gap_filler();
-                    }
-
-                    if ( grid[y][x][0] == EDGE_H ){
-                        horizontal_edge_with_side_bumps();
-                        gap_filler();
-                    }
-
-                    if ( grid[y][x][0] == SMALL_THREAD ){
-                        small_thread();
-                        gap_filler();
-                    }
-
-                    // bottom right corner
-                    if ( grid[y][x][1] == EDGE_V ){
-                        mirror([0,1,0]){
+                        import(large_octagon_hole_with_side_holes_file);
+                        
+                        // echo("y=", y, " x=", x, " setting=", grid[y][x]);
+                        
+                        // top right corner
+                        if ( grid[y][x][0] == EDGE_V ){
                             vertical_edge_with_side_bumps();
                             gap_filler();
                         }
-                    }
 
-                    if ( grid[y][x][1] == EDGE_H ){
-                        mirror([0,1,0]){
+                        if ( grid[y][x][0] == EDGE_H ){
                             horizontal_edge_with_side_bumps();
                             gap_filler();
                         }
-                    }
 
-                    if ( grid[y][x][1] == SMALL_THREAD ){
-                        mirror([0,1,0]){
+                        if ( grid[y][x][0] == SMALL_THREAD ){
                             small_thread();
                             gap_filler();
                         }
-                    }
 
-                    // bottom left corner
-                    if ( grid[y][x][2] == EDGE_V ){
-                        mirror([1,0,0]){
+                        // bottom right corner
+                        if ( grid[y][x][1] == EDGE_V ){
                             mirror([0,1,0]){
                                 vertical_edge_with_side_bumps();
                                 gap_filler();
                             }
                         }
-                    }
 
-                    if ( grid[y][x][2] == EDGE_H ){
-                        mirror([1,0,0]){
+                        if ( grid[y][x][1] == EDGE_H ){
                             mirror([0,1,0]){
                                 horizontal_edge_with_side_bumps();
                                 gap_filler();
                             }
                         }
-                    }
 
-                    if ( grid[y][x][2] == SMALL_THREAD ){
-                        mirror([1,0,0]){
+                        if ( grid[y][x][1] == SMALL_THREAD ){
                             mirror([0,1,0]){
                                 small_thread();
                                 gap_filler();
                             }
                         }
-                    }
 
-                    // top left corner
-                    if ( grid[y][x][3] == EDGE_V ){
-                        mirror([1,0,0]){
-                            vertical_edge_with_side_bumps();
-                            gap_filler();
+                        // bottom left corner
+                        if ( grid[y][x][2] == EDGE_V ){
+                            mirror([1,0,0]){
+                                mirror([0,1,0]){
+                                    vertical_edge_with_side_bumps();
+                                    gap_filler();
+                                }
+                            }
                         }
-                    }
 
-                    if ( grid[y][x][3] == EDGE_H ){
-                        mirror([1,0,0]){
-                            horizontal_edge_with_side_bumps();
-                            gap_filler();
+                        if ( grid[y][x][2] == EDGE_H ){
+                            mirror([1,0,0]){
+                                mirror([0,1,0]){
+                                    horizontal_edge_with_side_bumps();
+                                    gap_filler();
+                                }
+                            }
                         }
-                    }
 
-                    if ( grid[y][x][3] == SMALL_THREAD ){
-                        mirror([1,0,0]){
-                            small_thread();
-                            gap_filler();
+                        if ( grid[y][x][2] == SMALL_THREAD ){
+                            mirror([1,0,0]){
+                                mirror([0,1,0]){
+                                    small_thread();
+                                    gap_filler();
+                                }
+                            }
                         }
-                    }
-                    
-                    
-                    // fix gaps
-                    // fix gaps -- bottom-right
-                    if ( y-1 >= 0 && grid[y-1][x][0] != NONE ){
-                         mirror([0,1,0]){
-                            gap_filler();
-                        }
-                    }
 
-                    // fix gaps -- bottom-left
-                    if ( x-1 >= 0 && y-1 >= 0 && grid[y-1][x-1][0] != NONE ){
-                        mirror([1,0,0]){
+                        // top left corner
+                        if ( grid[y][x][3] == EDGE_V ){
+                            mirror([1,0,0]){
+                                vertical_edge_with_side_bumps();
+                                gap_filler();
+                            }
+                        }
+
+                        if ( grid[y][x][3] == EDGE_H ){
+                            mirror([1,0,0]){
+                                horizontal_edge_with_side_bumps();
+                                gap_filler();
+                            }
+                        }
+
+                        if ( grid[y][x][3] == SMALL_THREAD ){
+                            mirror([1,0,0]){
+                                small_thread();
+                                gap_filler();
+                            }
+                        }
+                        
+                        
+                        // fix gaps
+                        // fix gaps -- bottom-right
+                        if ( y-1 >= 0 && grid[y-1][x][0] != NONE ){
                             mirror([0,1,0]){
                                 gap_filler();
                             }
                         }
-                    }
 
-                    // fix gaps -- top-left
-                    if ( x-1 >= 0 && grid[y][x-1][0] != NONE ){
-                        mirror([1,0,0]){
-                            gap_filler();
+                        // fix gaps -- bottom-left
+                        if ( x-1 >= 0 && y-1 >= 0 && grid[y-1][x-1][0] != NONE ){
+                            mirror([1,0,0]){
+                                mirror([0,1,0]){
+                                    gap_filler();
+                                }
+                            }
                         }
-                    }
 
-                    // fix gaps -- cell to left 
-                    if ( x-1 >= 0 && grid[y][x-1][1] != NONE ){
-                        mirror([1,0,0]){
-                            mirror([0,1,0]){
+                        // fix gaps -- top-left
+                        if ( x-1 >= 0 && grid[y][x-1][0] != NONE ){
+                            mirror([1,0,0]){
                                 gap_filler();
                             }
                         }
-                    }
 
-                    // fix gaps -- cell below 
-                    if ( y-1 >= 0 && grid[y-1][x][3] != NONE ){
-                        mirror([1,0,0]){
-                            mirror([0,1,0]){
-                                gap_filler();
+                        // fix gaps -- cell to left 
+                        if ( x-1 >= 0 && grid[y][x-1][1] != NONE ){
+                            mirror([1,0,0]){
+                                mirror([0,1,0]){
+                                    gap_filler();
+                                }
                             }
                         }
-                    }
-                    
-                } // end translate
 
-            } // end skip
+                        // fix gaps -- cell below 
+                        if ( y-1 >= 0 && grid[y-1][x][3] != NONE ){
+                            mirror([1,0,0]){
+                                mirror([0,1,0]){
+                                    gap_filler();
+                                }
+                            }
+                        }
+                        
+                    } // end translate
 
+                } // end skip
+
+            }
         }
     }
+
 }
